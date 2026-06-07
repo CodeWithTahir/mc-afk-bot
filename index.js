@@ -104,10 +104,38 @@ app.get('/', (req, res) => {
     <h2>Kick History</h2>
     <table>${kickRows}</table>
 
-    <div class="footer">Auto-refreshes every 10 seconds · Bot started ${new Date(status.startedAt).toLocaleString()}</div>
+    <div class=\"footer\">Auto-refreshes every 10 seconds · Bot started ${new Date(status.startedAt).toLocaleString()}<br>POST /reconnect &nbsp;·&nbsp; POST /shutdown</div>
   </div>
 </body>
 </html>`);
+});
+
+app.post('/shutdown', (req, res) => {
+  console.log('Shutdown requested via HTTP.');
+  res.json({ ok: true, message: 'Bot shutting down.' });
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (currentBot) {
+    currentBot.quit('Shutdown requested');
+    currentBot = null;
+  }
+  setTimeout(() => process.exit(0), 500);
+});
+
+app.post('/reconnect', (req, res) => {
+  console.log('Reconnect requested via HTTP.');
+  res.json({ ok: true, message: 'Bot reconnecting in 3 seconds.' });
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (currentBot) {
+    currentBot.quit('Reconnect requested');
+    currentBot = null;
+  }
+  reconnectTimer = setTimeout(createBot, 3000);
 });
 
 const PORT = process.env.PORT || 8080;
@@ -124,12 +152,8 @@ const serverPort = parseInt(serverPortStr, 10);
 
 status.server = rawIP;
 
-let afkIntervals = [];
-
-function clearAFK() {
-  afkIntervals.forEach(clearTimeout);
-  afkIntervals = [];
-}
+let currentBot = null;
+let reconnectTimer = null;
 
 function createBot() {
   status.state = 'connecting';
@@ -143,6 +167,8 @@ function createBot() {
     checkTimeoutInterval: 60000
   });
 
+  currentBot = bot;
+
   bot.on('login', () => {
     status.username = bot.username;
     console.log(`Bot joined as ${bot.username}!`);
@@ -151,15 +177,7 @@ function createBot() {
   bot.on('spawn', () => {
     status.state = 'online';
     status.connectedAt = new Date();
-    console.log('Bot spawned. Waiting for chunks...');
-    clearAFK();
-
-    bot.waitForChunksToLoad().then(() => {
-      console.log('Chunks loaded. Anti-AFK active.');
-      startAntiAFK(bot);
-    }).catch(() => {
-      setTimeout(() => startAntiAFK(bot), 5000);
-    });
+    console.log('Bot spawned and connected.');
   });
 
   bot.on('kicked', (reason) => {
@@ -171,50 +189,26 @@ function createBot() {
     console.log('Bot kicked:', readable);
     status.kicks.push({ time: new Date(), reason: readable });
     if (status.kicks.length > 50) status.kicks.shift();
-    clearAFK();
   });
 
   bot.on('error', (err) => {
     console.error('Bot error:', err.message);
     status.errors.push({ time: new Date(), message: err.message });
     if (status.errors.length > 20) status.errors.shift();
-    clearAFK();
   });
 
   bot.on('end', () => {
-    status.state = 'offline';
-    status.disconnectedAt = new Date();
-    console.log('Bot disconnected. Reconnecting in 20 seconds...');
-    clearAFK();
-    setTimeout(createBot, 20000);
+    if (currentBot === bot) {
+      currentBot = null;
+      status.state = 'offline';
+      status.disconnectedAt = new Date();
+      console.log('Bot disconnected. Reconnecting in 20 seconds...');
+      reconnectTimer = setTimeout(createBot, 20000);
+    } else {
+      status.state = 'offline';
+      status.disconnectedAt = new Date();
+    }
   });
-}
-
-// ── ANTI-AFK ──────────────────────────────────────────────────────────────────
-function startAntiAFK(bot) {
-  function scheduleRandomLook() {
-    const delay = 8000 + Math.random() * 12000;
-    const t = setTimeout(() => {
-      if (!bot.entity) return;
-      bot.look((Math.random() * 2 - 1) * Math.PI, (Math.random() - 0.5) * (Math.PI / 3), true);
-      scheduleRandomLook();
-    }, delay);
-    afkIntervals.push(t);
-  }
-
-  function scheduleArmSwing() {
-    const delay = 25000 + Math.random() * 15000;
-    const t = setTimeout(() => {
-      if (!bot.entity) return;
-      bot.swingArm('right');
-      console.log('Anti-AFK: arm swing.');
-      scheduleArmSwing();
-    }, delay);
-    afkIntervals.push(t);
-  }
-
-  scheduleRandomLook();
-  scheduleArmSwing();
 }
 
 // ── START ─────────────────────────────────────────────────────────────────────
