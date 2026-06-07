@@ -72,6 +72,17 @@ app.get('/', (req, res) => {
     tr:last-child td { border-bottom: none; }
     .footer { margin-top: 20px; text-align: center; font-size: 0.72rem; color: #475569; }
     .dot { width: 10px; height: 10px; border-radius: 50%; background: ${stateColor}; display: inline-block; box-shadow: 0 0 6px ${stateColor}; }
+    .controls { display: flex; gap: 12px; margin-top: 24px; }
+    .btn { flex: 1; padding: 11px 16px; border: none; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: background 0.15s, opacity 0.15s, transform 0.1s; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-reconnect { background: #1d4ed8; color: #eff6ff; border: 1px solid #2563eb; }
+    .btn-reconnect:hover:not(:disabled) { background: #2563eb; }
+    .btn-shutdown { background: #7f1d1d; color: #fef2f2; border: 1px solid #991b1b; }
+    .btn-shutdown:hover:not(:disabled) { background: #991b1b; }
+    .msg { margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; display: none; }
+    .msg-ok  { background: #14532d44; color: #4ade80; border: 1px solid #16a34a55; }
+    .msg-err { background: #7f1d1d44; color: #f87171; border: 1px solid #991b1b55; }
   </style>
 </head>
 <body>
@@ -104,10 +115,49 @@ app.get('/', (req, res) => {
     <h2>Kick History</h2>
     <table>${kickRows}</table>
 
-    <div class=\"footer\">Auto-refreshes every 10 seconds · Bot started ${new Date(status.startedAt).toLocaleString()}<br>POST /reconnect &nbsp;·&nbsp; POST /shutdown</div>
+    <div class=\"controls\">
+      <button class=\"btn btn-reconnect\" id=\"btnReconnect\" onclick=\"doAction('reconnect')\">⟳ Reconnect</button>
+      <button class=\"btn btn-shutdown\"  id=\"btnShutdown\"  onclick=\"doAction('shutdown')\">⏻ Shutdown</button>
+    </div>
+    <div class=\"msg\" id=\"msg\"></div>
+
+    <div class=\"footer\">Auto-refreshes every 10 seconds · Bot started ${new Date(status.startedAt).toLocaleString()}</div>
+
   </div>
+
+  <script>
+    async function doAction(action) {
+      if (action === 'shutdown' && !confirm('Shut down the bot? It will stop running until the service restarts.')) return;
+      const btnReconnect = document.getElementById('btnReconnect');
+      const btnShutdown  = document.getElementById('btnShutdown');
+      const msg          = document.getElementById('msg');
+      btnReconnect.disabled = true;
+      btnShutdown.disabled  = true;
+      const activeBtn = document.getElementById(action === 'reconnect' ? 'btnReconnect' : 'btnShutdown');
+      const originalText = activeBtn.textContent;
+      activeBtn.textContent = 'Working\u2026';
+      msg.style.display = 'none';
+      msg.className = 'msg';
+      try {
+        const res  = await fetch('/' + action, { method: 'POST' });
+        const data = await res.json();
+        msg.textContent   = data.message || 'Done.';
+        msg.className     = 'msg msg-ok';
+        msg.style.display = 'block';
+      } catch (err) {
+        msg.textContent   = 'Request failed: ' + err.message;
+        msg.className     = 'msg msg-err';
+        msg.style.display = 'block';
+      } finally {
+        activeBtn.textContent = originalText;
+        btnReconnect.disabled = false;
+        btnShutdown.disabled  = false;
+      }
+    }
+  </script>
 </body>
 </html>`);
+
 });
 
 app.post('/shutdown', (req, res) => {
