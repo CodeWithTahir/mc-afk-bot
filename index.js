@@ -68,6 +68,13 @@ app.post('/api/shutdown', (req, res) => {
   setTimeout(() => process.exit(0), 1000);
 });
 
+app.post('/api/home', (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!currentBot || status.state !== 'online') return res.status(400).json({ error: 'Bot is not online.' });
+  currentBot.chat('/home afk');
+  res.json({ message: 'Sent: /home afk' });
+});
+
 // ── STATUS API ────────────────────────────────────────────────────────────────
 app.get('/status', (req, res) => {
   res.json({
@@ -121,6 +128,7 @@ app.get('/', (req, res) => {
     .btn-green { background: #16a34a; color: #fff; }
     .btn-yellow { background: #d97706; color: #fff; }
     .btn-red { background: #dc2626; color: #fff; }
+    .btn-blue { background: #2563eb; color: #fff; }
     .pw-wrap { margin-bottom: 16px; }
     .pw-wrap input { width: 100%; padding: 8px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 0.9rem; }
     .msg { font-size: 0.8rem; color: #94a3b8; margin-top: 8px; min-height: 18px; }
@@ -169,6 +177,7 @@ app.get('/', (req, res) => {
       <button class="btn btn-green" onclick="action('reconnect')">🔄 Reconnect</button>
       <button class="btn btn-yellow" onclick="action('disconnect')">⏸ Disconnect</button>
       <button class="btn btn-red" onclick="action('shutdown')">⏹ Shutdown</button>
+      <button class="btn btn-blue" onclick="action('home')">🏠 /home afk</button>
     </div>
     <div class="msg" id="msg"></div>
 
