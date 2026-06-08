@@ -78,6 +78,8 @@ app.get('/', (req, res) => {
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .btn-reconnect { background: #1d4ed8; color: #eff6ff; border: 1px solid #2563eb; }
     .btn-reconnect:hover:not(:disabled) { background: #2563eb; }
+    .btn-disconnect { background: #78350f; color: #fffbeb; border: 1px solid #92400e; }
+    .btn-disconnect:hover:not(:disabled) { background: #92400e; }
     .btn-shutdown { background: #7f1d1d; color: #fef2f2; border: 1px solid #991b1b; }
     .btn-shutdown:hover:not(:disabled) { background: #991b1b; }
     .msg { margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; display: none; }
@@ -116,8 +118,9 @@ app.get('/', (req, res) => {
     <table>${kickRows}</table>
 
     <div class=\"controls\">
-      <button class=\"btn btn-reconnect\" id=\"btnReconnect\" onclick=\"doAction('reconnect')\">⟳ Reconnect</button>
-      <button class=\"btn btn-shutdown\"  id=\"btnShutdown\"  onclick=\"doAction('shutdown')\">⏻ Shutdown</button>
+      <button class=\"btn btn-reconnect\"  id=\"btnReconnect\"  onclick=\"doAction('reconnect')\">⟳ Reconnect</button>
+      <button class=\"btn btn-disconnect\" id=\"btnDisconnect\" onclick=\"doAction('disconnect')\">⏏ Disconnect</button>
+      <button class=\"btn btn-shutdown\"   id=\"btnShutdown\"   onclick=\"doAction('shutdown')\">⏻ Shutdown</button>
     </div>
     <div class=\"msg\" id=\"msg\"></div>
 
@@ -128,12 +131,15 @@ app.get('/', (req, res) => {
   <script>
     async function doAction(action) {
       if (action === 'shutdown' && !confirm('Shut down the bot? It will stop running until the service restarts.')) return;
-      const btnReconnect = document.getElementById('btnReconnect');
-      const btnShutdown  = document.getElementById('btnShutdown');
-      const msg          = document.getElementById('msg');
-      btnReconnect.disabled = true;
-      btnShutdown.disabled  = true;
-      const activeBtn = document.getElementById(action === 'reconnect' ? 'btnReconnect' : 'btnShutdown');
+      const btnReconnect  = document.getElementById('btnReconnect');
+      const btnDisconnect = document.getElementById('btnDisconnect');
+      const btnShutdown   = document.getElementById('btnShutdown');
+      const msg           = document.getElementById('msg');
+      btnReconnect.disabled  = true;
+      btnDisconnect.disabled = true;
+      btnShutdown.disabled   = true;
+      const idMap = { reconnect: 'btnReconnect', disconnect: 'btnDisconnect', shutdown: 'btnShutdown' };
+      const activeBtn = document.getElementById(idMap[action]);
       const originalText = activeBtn.textContent;
       activeBtn.textContent = 'Working\u2026';
       msg.style.display = 'none';
@@ -149,13 +155,13 @@ app.get('/', (req, res) => {
         msg.className     = 'msg msg-err';
         msg.style.display = 'block';
       } finally {
-        activeBtn.textContent = originalText;
-        btnReconnect.disabled = false;
-        btnShutdown.disabled  = false;
+        activeBtn.textContent  = originalText;
+        btnReconnect.disabled  = false;
+        btnDisconnect.disabled = false;
+        btnShutdown.disabled   = false;
       }
     }
   </script>
-</body>
 </html>`);
 
 });
@@ -186,6 +192,17 @@ app.post('/reconnect', (req, res) => {
     currentBot = null;
   }
   reconnectTimer = setTimeout(createBot, 3000);
+});
+
+app.post('/disconnect', (req, res) => {
+  console.log('Disconnect requested via HTTP.');
+  if (currentBot) {
+    currentBot.quit('Disconnect requested');
+    currentBot = null;
+    res.json({ ok: true, message: 'Bot disconnected. Will auto-reconnect in 20 seconds.' });
+  } else {
+    res.json({ ok: true, message: 'Bot was not connected.' });
+  }
 });
 
 const PORT = process.env.PORT || 8080;
