@@ -9,11 +9,9 @@ const status = {
   server: null,
   connectedAt: null,
   disconnectedAt: null,
-  food: null,
-  health: null,
   kicks: [],                // [{ time, reason }]
   errors: [],               // [{ time, message }]
-  startedAt: new Date()A
+  startedAt: new Date()
 };
 
 function timeSince(date) {
@@ -74,8 +72,6 @@ app.get('/', (req, res) => {
     tr:last-child td { border-bottom: none; }
     .footer { margin-top: 20px; text-align: center; font-size: 0.72rem; color: #475569; }
     .dot { width: 10px; height: 10px; border-radius: 50%; background: ${stateColor}; display: inline-block; box-shadow: 0 0 6px ${stateColor}; }
-    .bar-wrap { background: #0f172a; border-radius: 99px; height: 8px; margin-top: 6px; overflow: hidden; }
-    .bar { height: 8px; border-radius: 99px; transition: width 0.3s; }
   </style>
 </head>
 <body>
@@ -102,16 +98,6 @@ app.get('/', (req, res) => {
       <div class="stat">
         <div class="stat-label">Total Kicks</div>
         <div class="stat-value">${status.kicks.length}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">❤️ Health</div>
-        <div class="stat-value">${status.health !== null ? Math.round(status.health) + '/20' : '—'}</div>
-        ${status.health !== null ? `<div class="bar-wrap"><div class="bar" style="width:${(status.health/20)*100}%;background:#ef4444"></div></div>` : ''}
-      </div>
-      <div class="stat">
-        <div class="stat-label">🍗 Food</div>
-        <div class="stat-value">${status.food !== null ? status.food + '/20' : '—'}</div>
-        ${status.food !== null ? `<div class="bar-wrap"><div class="bar" style="width:${(status.food/20)*100}%;background:#f59e0b"></div></div>` : ''}
       </div>
     </div>
 
@@ -154,8 +140,7 @@ function createBot() {
     username: process.env.MC_EMAIL || 'YourEmail@gmail.com',
     auth: 'microsoft',
     version: '1.21.11',
-    checkTimeoutInterval: 60000,
-    profilesFolder: process.env.AUTH_CACHE_DIR || './auth-cache'
+    checkTimeoutInterval: 60000
   });
 
   bot.on('login', () => {
@@ -170,18 +155,11 @@ function createBot() {
     clearAFK();
 
     bot.waitForChunksToLoad().then(() => {
-      console.log('Chunks loaded. Anti-AFK + Auto-eat active.');
+      console.log('Chunks loaded. Anti-AFK active.');
       startAntiAFK(bot);
     }).catch(() => {
       setTimeout(() => startAntiAFK(bot), 5000);
     });
-  });
-
-  // Auto-eat: triggers whenever food/health changes
-  bot.on('health', () => {
-    status.food = bot.food;
-    status.health = bot.health;
-    if (bot.food < 18) autoEat(bot);
   });
 
   bot.on('kicked', (reason) => {
@@ -210,34 +188,6 @@ function createBot() {
     clearAFK();
     setTimeout(createBot, 20000);
   });
-}
-
-// ── AUTO-EAT ─────────────────────────────────────────────────────────────────
-let isEating = false;
-
-async function autoEat(bot) {
-  if (isEating || !bot.entity) return;
-
-  // Find any edible item in inventory
-  const food = bot.inventory.items().find(item =>
-    bot.registry.foodsByName[item.name] !== undefined
-  );
-
-  if (!food) {
-    console.log('Auto-eat: hungry but no food in inventory.');
-    return;
-  }
-
-  try {
-    isEating = true;
-    await bot.equip(food, 'hand');
-    await bot.consume();
-    console.log(`Auto-eat: ate ${food.name} (food level: ${bot.food}/20).`);
-  } catch (err) {
-    console.log('Auto-eat error:', err.message);
-  } finally {
-    isEating = false;
-  }
 }
 
 // ── ANTI-AFK ──────────────────────────────────────────────────────────────────
