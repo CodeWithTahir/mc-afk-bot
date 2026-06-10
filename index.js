@@ -52,10 +52,10 @@ app.post('/api/disconnect', (req, res) => {
 
 app.post('/api/reconnect', (req, res) => {
   if (!checkAuth(req, res)) return;
-  manuallyDisconnected = false;
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  manuallyDisconnected = true;
   if (currentBot) { currentBot.quit('Reconnecting'); }
-  setTimeout(createBot, 1000);
+  setTimeout(() => { manuallyDisconnected = false; createBot(); }, 3000);
   res.json({ message: 'Reconnecting...' });
 });
 
@@ -278,13 +278,13 @@ function createBot() {
     clearAFK();
   });
 
-  bot.on('end', () => {
+  bot.on('end', (reason) => {
     status.state = 'offline';
     status.disconnectedAt = new Date();
     clearAFK();
     if (!manuallyDisconnected) {
-      console.log('Bot disconnected. Reconnecting in 20 seconds...');
-      reconnectTimer = setTimeout(createBot, 20000);
+      console.log(`Bot disconnected (reason: ${reason || 'unknown'}). Reconnecting in 30 seconds...`);
+      reconnectTimer = setTimeout(createBot, 30000);
     } else {
       console.log('Bot manually disconnected. Not reconnecting.');
     }
