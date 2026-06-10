@@ -246,15 +246,19 @@ function createBot() {
     console.log(`Bot joined as ${bot.username}!`);
   });
 
-  const spawnTimeout = setTimeout(() => {
-    if (status.state === 'connecting') {
-      console.log('Spawn timeout: bot did not join within 90s. Reconnecting...');
-      bot.quit('spawn timeout');
-    }
-  }, 90000);
+  let spawnTimeout = null;
+
+  bot.on('login', () => {
+    spawnTimeout = setTimeout(() => {
+      if (status.state === 'connecting') {
+        console.log('Spawn timeout: bot logged in but did not spawn within 3 min. Reconnecting...');
+        bot.quit('spawn timeout');
+      }
+    }, 180000);
+  });
 
   bot.on('spawn', () => {
-    clearTimeout(spawnTimeout);
+    if (spawnTimeout) { clearTimeout(spawnTimeout); spawnTimeout = null; }
     status.state = 'online';
     status.connectedAt = new Date();
     console.log('Bot spawned. Waiting for chunks...');
