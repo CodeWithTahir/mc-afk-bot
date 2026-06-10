@@ -234,8 +234,8 @@ function createBot() {
     port: serverPort,
     username: process.env.MC_EMAIL || 'YourEmail@gmail.com',
     auth: 'microsoft',
-    version: '1.21.11',
-    checkTimeoutInterval: 60000,
+    version: false,
+    checkTimeoutInterval: 120000,
     profilesFolder: process.env.AUTH_CACHE_DIR || './auth-cache'
   });
 
@@ -246,7 +246,15 @@ function createBot() {
     console.log(`Bot joined as ${bot.username}!`);
   });
 
+  const spawnTimeout = setTimeout(() => {
+    if (status.state === 'connecting') {
+      console.log('Spawn timeout: bot did not join within 90s. Reconnecting...');
+      bot.quit('spawn timeout');
+    }
+  }, 90000);
+
   bot.on('spawn', () => {
+    clearTimeout(spawnTimeout);
     status.state = 'online';
     status.connectedAt = new Date();
     console.log('Bot spawned. Waiting for chunks...');
